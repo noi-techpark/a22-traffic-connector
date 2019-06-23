@@ -183,14 +183,14 @@ It is also designed to keep running if the web service or database becomes unava
 It will just sleep and reconnect.
 
 However, follow mode is slow (not multi threaded, so the web service latency adds up)
-and **not*** memory efficient.
+and **not** memory efficient.
 
 **For performance reasons, the lower bound of the interval to download is capped at 1 week in the past**. 
 
 (:exclamation:) If you want to bring up a database that is outdated for more than
 a week (and want to avoid gaps in the data), you need to first catch up using bulk mode.
 
-As one week of backlog can already be a lot of data it is recommended to catch up as close
+As one week of backlog can already be a lot of data, it is recommended to catch up as close
 as possible to the current time using bulk mode, for example to 00:00:00 of the current day
 and only then start follow mode again.
 
