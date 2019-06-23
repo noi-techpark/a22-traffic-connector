@@ -1,0 +1,163 @@
+/*
+    A22 traffic API connector.
+
+    Retrieve A22 traffic data and store it into a PostgreSQL database.
+
+    (C) 2018 IDM Suedtirol - Alto Adige
+    (C) 2019 NOI Techpark Südtirol / Alto Adige
+
+    Author: Chris Mair - chris@1006.org  
+ */
+package it.bz.noi.a22traffic;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+
+/**
+ * A22 traffic API connector: implements the "follow" operation.
+ */
+public class Follower {
+
+    private static final boolean DEBUG = false;
+
+    public static void fetchNew(Connector conn, String jdbc_url) throws IOException, ClassNotFoundException, SQLException {
+
+        int i;
+        PreparedStatement pst;
+        ResultSet rs;
+
+        // ---------------------------------------------------------------------
+        // connect to the DB
+        Connection db;
+        Class.forName("org.postgresql.Driver");
+        db = DriverManager.getConnection(jdbc_url);
+        db.setAutoCommit(false);
+
+        // ---------------------------------------------------------------------
+        // get the sensors
+        ArrayList<HashMap<String, String>> sensors = conn.getTrafficSensors();
+        System.out.println("follow mode: number of sensors: " + sensors.size());
+
+        // ---------------------------------------------------------------------
+        // for each sensor, perform an insert on conflict do nothing into table a22.a22_station (to store new sensors, if there are any)
+        int new_sensor_count = 0;
+        pst = db.prepareStatement("insert into a22.a22_station (code, name, geo) values (?, ?, ?) on conflict do nothing");
+        for (i = 0; i < sensors.size(); i++) {
+            pst.setString(1, sensors.get(i).get("stationcode"));
+            pst.setString(2, sensors.get(i).get("name"));
+            pst.setString(3, sensors.get(i).get("pointprojection"));
+            pst.execute();
+            new_sensor_count += pst.getUpdateCount();
+        }
+        pst.close();
+        db.commit();
+        System.out.println("follow mode: new sensor count: " + new_sensor_count);
+
+        // ---------------------------------------------------------------------
+        // reshape sensors so we get a list of sensors associated to each coilid
+        HashMap<String, ArrayList<String>> coils = new HashMap<>();
+        for (i = 0; i < sensors.size(); i++) {
+            // stationcode = A22:coilid:sensorid
+            String split[] = sensors.get(i).get("stationcode").split(":");
+            if (split.length != 3) {
+                System.out.println("skipping wrong format station code: " + sensors.get(i).get("stationcode"));
+            }
+            String coilid = split[1];
+            if (coils.get(coilid) == null) {
+                coils.put(coilid, new ArrayList<>());
+            }
+            coils.get(coilid).add(sensors.get(i).get("stationcode"));
+        }
+
+        // ---------------------------------------------------------------------
+        // for each coilid, get the max(timestamp) among its sensors (going back up to one week)
+        HashMap<String, Integer> coils_ts = new HashMap<>();
+        long cap = Instant.now().getEpochSecond() - 7 * 24 * 60 * 60;
+        System.out.println("follow mode: getting max(timestamp) for each sensor capped at " + cap);
+        pst = db.prepareStatement("select coalesce(max(timestamp)," + cap + ") from a22.a22_traffic where stationcode = ? and timestamp > " + cap);
+        for (String coilid : coils.keySet()) {
+            if (DEBUG) {
+                System.out.println("coil id: " + coilid);
+                System.out.print("  +- ");
+            }
+            int max = 0;
+            for (String c : coils.get(coilid)) {
+                if (DEBUG) {
+                    System.out.print(c + " ");
+                }
+                pst.setString(1, c);
+                rs = pst.executeQuery();
+                rs.next();
+                int t = rs.getInt(1);
+                if (t > max) {
+                    max = t;
+                }
+            }
+            if (max == 0) {
+                max = (int)cap; // uhm year 2038 problem... but the db has an int field anyway
+            }
+            max = max + 1;
+            if (DEBUG) {
+                System.out.print(" -> max ts = " + max);
+                System.out.println();
+            } else {
+                System.out.print(".");
+                System.out.flush();
+            }
+            coils_ts.put(coilid, max);
+        }
+        pst.close();
+        db.commit();
+        if (!DEBUG) {
+            System.out.println();
+        }
+
+        // ---------------------------------------------------------------------
+        // perform getVehicles() operation
+        long t0 = System.currentTimeMillis();
+
+        ArrayList<HashMap<String, String>> res;
+        System.out.println("follow mode: getting events:");
+
+        res = conn.getVehicles(0, 0, Instant.now().getEpochSecond(), sensors, coils_ts);
+
+        long t1 = System.currentTimeMillis();
+
+        pst = db.prepareStatement(
+                "insert into a22.a22_traffic "
+                + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction) "
+                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        for (i = 0; i < res.size(); i++) {
+            pst.setString(1, res.get(i).get("stationcode"));
+            pst.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
+            pst.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
+            pst.setDouble(4, Double.parseDouble(res.get(i).get("headway")));
+            pst.setDouble(5, Double.parseDouble(res.get(i).get("length")));
+            pst.setInt(6, Integer.parseInt(res.get(i).get("axles")));
+            pst.setBoolean(7, Boolean.parseBoolean(res.get(i).get("against_traffic")));
+            pst.setInt(8, Integer.parseInt(res.get(i).get("class")));
+            pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
+            pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
+            pst.execute();
+        }
+        pst.close();
+        db.commit();
+
+        long t2 = System.currentTimeMillis();
+
+        System.out.println("follow mode: " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms)");
+            
+        // ---------------------------------------------------------------------
+        // disconnect from Postgres
+        db.close();
+
+    }
+
+}
