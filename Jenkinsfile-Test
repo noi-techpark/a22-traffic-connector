@@ -1,0 +1,47 @@
+pipeline {
+    agent {
+        dockerfile {
+            filename 'docker/dockerfile-java'
+            additionalBuildArgs '--build-arg JENKINS_USER_ID=`id -u jenkins` --build-arg JENKINS_GROUP_ID=`id -g jenkins`'
+        }
+    }
+    
+    environment {
+        A22_USER_NAME=credentials('test-a22user')
+        PGPASSWORD=credentials('test-a22password')
+        IMPORT_INTERVAL_MINUTES=7
+        DB_URL='test-pg-bdp.co90ybcr8iim.eu-west-1.rds.amazonaws.com'
+    }
+
+    stages {
+        stage('Configure') {
+            steps {
+                sh 'sed -i -e "s/<\\/settings>$//g\" ~/.m2/settings.xml'
+                sh 'echo "    <servers>" >> ~/.m2/settings.xml'
+                sh 'echo "        ${TESTSERVER_TOMCAT_CREDENTIALS}" >> ~/.m2/settings.xml'
+                sh 'echo "    </servers>" >> ~/.m2/settings.xml'
+                sh 'echo "</settings>" >> ~/.m2/settings.xml'
+            }
+        }
+        stage('create/recreate db'){
+            steps{
+                sh 'psql -h ${DB_URL} -U ${A22_USER_NAME} a22db < a22db.sql'
+            }
+        }
+
+        stage('Import recent data') {
+            steps {
+                sh 'java
+                -DJDBC_URL=jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_USER_PASSWORD}&password=${PGPASSWORD} -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar `date "+%s"` `date --date="${IMPORT_INTERVAL_MINUTES} minute ago" +"%s"`'
+            }
+        }
+
+        stage('Import data and follow') {
+            steps {
+                sh 'java
+                -DJDBC_URL=jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_USER_PASSWORD}&password=${PGPASSWORD}
+                -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar follow`'
+            }
+        }
+    }
+}
