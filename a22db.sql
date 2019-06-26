@@ -8,7 +8,7 @@
 
     Author: Chris Mair - chris@1006.org  
  */
-
+DROP SCHEMA IF EXISTS a22 CASCADE;
 CREATE SCHEMA a22;
 
 -- the list of sensors
