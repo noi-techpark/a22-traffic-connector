@@ -234,6 +234,20 @@ de-auth OK, old token = xxxxxxxx-xxxx-xxxx-xxxx-************, time = 2019-06-23T
 [...]
 ```
 
+About "ghost" sensors.
 
+Sometimes the A22 sends traffic events related to unknown sensors. Those
+sensors would not be correctly taken into account when computing the last
+timestamp stored for the sensor group to be polled. This might lead to
+repeated downloads of lots of data for these unknown sensors.
 
+To work around this problem, a "ghost" sensor table (`a22.a22_ghost_station`)
+has been introduced, where unknown sensor identifiers are stored. This table is
+used to correct the last timestamp computation and helps avoid the repeated
+download problem.
+
+The `a22.a22_ghost_station` can be safely ignored by users of the data. When
+the A22 web service adds former "ghost" sensor to the official list, they get
+automatically added to `a22.a22_station` as any new sensor.  No maintenance is
+needed. 
 

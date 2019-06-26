@@ -19,6 +19,15 @@ CREATE TABLE a22.a22_station (
     geo text NOT NULL
 );
 
+
+-- the list of ghost sensors (unknown sensors that have sent data)
+-- code has the form 'A22:coil_id:sensor_id'
+CREATE TABLE a22.a22_ghost_station (
+    code text primary key,
+    inserted_when timestamptz NOT NULL default now()
+);
+
+
 -- the web service credentials, the application will look for credentials
 -- stored at id = 1
 CREATE TABLE a22.a22_webservice (
