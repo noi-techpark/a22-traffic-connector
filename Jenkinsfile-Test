@@ -9,7 +9,7 @@ pipeline {
     environment {
         A22_DB_USER_NAME=credentials('test-a22user')
         PGPASSWORD=credentials('test-a22password')
-        IMPORT_INTERVAL_MINUTES=7
+        IMPORT_INTERVAL_TIME='7 minute ago'
         DB_URL='test-pg-bdp.co90ybcr8iim.eu-west-1.rds.amazonaws.com'
         A22_WS_ENDPOINT=credentials('a22-traffic-endpoint')
         A22_WS_USER=credentials('a22-traffic-user3')
@@ -29,13 +29,17 @@ pipeline {
         stage('create/recreate db'){
             steps{
                 sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} a22db < a22db.sql'
-                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} -c "insert into a22_webservice(url,username,password) values(\\'${A22_WS_ENDPOINT}\\',\\'${A22_WS_USER}\\',\\'${A22_WS_PASSWORD}\\')" a22db';
+                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} -c "insert into a22.a22_webservice(url,username,password) values(\'${A22_WS_ENDPOINT}\',\'${A22_WS_USER}\',\'${A22_WS_PASSWORD}\')" a22db';
             }
         }
-
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
         stage('Import recent data') {
             steps {
-                sh 'java -DJDBC_URL=jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD} -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar `date "+%s"` `date --date="${IMPORT_INTERVAL_MINUTES} minute ago" +"%s"`'
+                sh '''java -DJDBC_URL=jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD} -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar interval `date "+%s"` `date --date="${IMPORT_INTERVAL_TIME}" \"+%s\"`'''
             }
         }
 
