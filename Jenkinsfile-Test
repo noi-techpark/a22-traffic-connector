@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Import recent data') {
             steps {
-                sh '''java -DJDBC_URL=jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD} -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar interval `date "+%s"` `date --date="${IMPORT_INTERVAL_TIME}" \"+%s\"`'''
+                sh '''java -DJDBC_URL='jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD}' -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar interval `date --date="${IMPORT_INTERVAL_TIME}" \"+%s\"` `date "+%s"`'''
             }
         }
 
