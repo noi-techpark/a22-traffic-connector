@@ -29,7 +29,7 @@ pipeline {
         stage('create/recreate db'){
             steps{
                 sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} a22db < a22db.sql'
-                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} -c "insert into a22_webservice(url,username,password) values(${A22_WS_ENDPOINT},${A22_WS_USER},${A22_WS_PASSWORD})" a22db';
+                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} -c "insert into a22_webservice(url,username,password) values(\\'${A22_WS_ENDPOINT}\\',\\'${A22_WS_USER}\\',\\'${A22_WS_PASSWORD}\\')" a22db';
             }
         }
 
