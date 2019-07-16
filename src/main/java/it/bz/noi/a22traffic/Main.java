@@ -37,7 +37,7 @@ public class Main {
      */
     public static void main(String[] args) throws Exception {
 
-        System.out.println("A22TrafficConnector invoked at " + ZonedDateTime.now());
+        System.out.println("A22TrafficConnector (20190626) invoked at " + ZonedDateTime.now());
 
         // ---------------------------------------------------------------------
         // parse and validate arguments

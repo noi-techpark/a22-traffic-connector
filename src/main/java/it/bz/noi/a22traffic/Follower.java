@@ -68,6 +68,7 @@ public class Follower {
             String split[] = sensors.get(i).get("stationcode").split(":");
             if (split.length != 3) {
                 System.out.println("skipping wrong format station code: " + sensors.get(i).get("stationcode"));
+                continue;
             }
             String coilid = split[1];
             if (coils.get(coilid) == null) {
@@ -75,10 +76,39 @@ public class Follower {
             }
             coils.get(coilid).add(sensors.get(i).get("stationcode"));
         }
-
+        
+        // ---------------------------------------------------------------------
+        // add ghost sensors to the list (exclude unghosted sensors)
+        pst = db.prepareStatement("select code from a22.a22_ghost_station except select code from a22.a22_station");
+        rs = pst.executeQuery();
+        int ghost_sensor_cnt = 0;
+        while (rs.next()) {
+            String s = rs.getString(1);
+            if (s == null) {
+                continue;
+            }
+             // stationcode = A22:coilid:sensorid
+            String split[] = s.split(":");
+            if (split.length != 3) {
+                System.out.println("skipping wrong format station code: " + s);
+                continue;
+            }
+            String coilid = split[1];
+            if (coils.get(coilid) == null) {
+                coils.put(coilid, new ArrayList<>());
+            }
+            coils.get(coilid).add(s);
+            ghost_sensor_cnt++;
+        }
+        pst.close();
+        db.commit();
+        System.out.println("follow mode: ghost sensor count: " + ghost_sensor_cnt);
+        
         // ---------------------------------------------------------------------
         // for each coilid, get the max(timestamp) among its sensors (going back up to one week)
+        // also create a fast sensor lookup list 
         HashMap<String, Integer> coils_ts = new HashMap<>();
+        HashMap<String, Integer> sensor_known = new HashMap<>();
         long cap = Instant.now().getEpochSecond() - 7 * 24 * 60 * 60;
         System.out.println("follow mode: getting max(timestamp) for each sensor capped at " + cap);
         pst = db.prepareStatement("select coalesce(max(timestamp)," + cap + ") from a22.a22_traffic where stationcode = ? and timestamp > " + cap);
@@ -99,6 +129,7 @@ public class Follower {
                 if (t > max) {
                     max = t;
                 }
+                sensor_known.put(c, 1);
             }
             if (max == 0) {
                 max = (int)cap; // uhm year 2038 problem... but the db has an int field anyway
@@ -120,10 +151,12 @@ public class Follower {
         }
 
         // ---------------------------------------------------------------------
-        // perform getVehicles() operation
+        // perform getVehicles() operation, insert new events, look for ghost sensors
         long t0 = System.currentTimeMillis();
 
         ArrayList<HashMap<String, String>> res;
+        HashMap<String, Integer> detected_ghosts = new HashMap<>();
+        
         System.out.println("follow mode: getting events:");
 
         res = conn.getVehicles(0, 0, Instant.now().getEpochSecond(), sensors, coils_ts);
@@ -135,6 +168,10 @@ public class Follower {
                 + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction) "
                 + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         for (i = 0; i < res.size(); i++) {
+            String s = res.get(i).get("stationcode");
+            if (!sensor_known.containsKey(s)) {
+                detected_ghosts.put(s, 1);
+            }
             pst.setString(1, res.get(i).get("stationcode"));
             pst.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
             pst.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
@@ -152,8 +189,16 @@ public class Follower {
 
         long t2 = System.currentTimeMillis();
 
-        System.out.println("follow mode: " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms)");
-            
+        pst = db.prepareStatement("insert into a22.a22_ghost_station (code) values (?)");
+        for (String s : detected_ghosts.keySet()) {
+            pst.setString(1, s);
+            pst.execute();
+        }
+        pst.close();
+        db.commit();
+        
+        System.out.println("follow mode: " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms), new ghost sensors detected: " + detected_ghosts.size());
+
         // ---------------------------------------------------------------------
         // disconnect from Postgres
         db.close();
