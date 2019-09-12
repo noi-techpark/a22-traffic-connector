@@ -40,7 +40,6 @@ CREATE TABLE a22.a22_webservice (
 
 -- the traffic transit events
 -- note there is intentionally no foreign key linking stationcode to a22.a22_station 
-
 CREATE TABLE a22.a22_traffic (
     stationcode text,
     "timestamp" integer,
@@ -56,4 +55,21 @@ CREATE TABLE a22.a22_traffic (
 
 CREATE INDEX a22_traffic_stationcode_ix ON a22.a22_traffic USING btree (stationcode);
 CREATE INDEX a22_traffic_timestamp_ix ON a22.a22_traffic USING btree ("timestamp");
+
+
+-- a view on the list of sensors that adds a numeric code for the lane
+CREATE VIEW a22.a22_station_v AS
+ SELECT a22_station.code,
+    a22_station.name,
+    a22_station.geo,
+        CASE
+            WHEN a22_station.name ~ '\(corsia di marcia nord,'::text THEN 1
+            WHEN a22_station.name ~ '\(corsia di sorpasso nord,'::text THEN 2
+            WHEN a22_station.name ~ '\(corsia di marcia sud,'::text THEN 3
+            WHEN a22_station.name ~ '\(corsia di sorpasso sud,'::text THEN 4
+            WHEN a22_station.name ~ '\(corsia di emergenza nord,'::text THEN 5
+            WHEN a22_station.name ~ '\(corsia di emergenza sud,'::text THEN 6
+            ELSE NULL::integer
+        END AS lane_code
+   FROM a22.a22_station;
 
