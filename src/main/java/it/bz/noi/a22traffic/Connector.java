@@ -369,54 +369,45 @@ public class Connector {
 
     private String getLaneText(String lane, String orientation) {
 
-        String s = "Corsia di ";
+        String s = "corsia di ";
 
         switch (lane) {
             case "1":
-                s += "Emergenza";
+                s += "marcia nord";
                 break;
             case "2":
-                s += "Marcia";
+                s += "sorpasso nord";
                 break;
             case "3":
-                s += "Sorpasso";
+                s += "marcia sud";
                 break;
             case "4":
-                s += "Sorpasso veloce";
+                s += "sorpasso sud";
                 break;
             case "5":
-                s += "Intera carreggiata";
+                s += "emergenza nord";
                 break;
             case "6":
-                s += "Piazzola di sosta";
-                break;
-            case "7":
-                s += "Emergenza e marcia";
-                break;
-            case "8":
-                s += "Marcia e sorpasso";
-                break;
-            case "9":
-                s += "Banchina";
+                s += "emergenza sud";
                 break;
             default:
                 s += "n/a";
         }
 
-        s += ", Direzione ";
+        s += ", direzione ";
 
         switch (orientation) {
             case "1":
-                s += "Sud";
+                s += "sud";
                 break;
             case "2":
-                s += "Nord";
+                s += "nord";
                 break;
             case "3":
-                s += "Entrambe";
+                s += "entrambe";
                 break;
             case "4":
-                s += "Non definita";
+                s += "non definita";
                 break;
             default:
                 s += "n/a";
