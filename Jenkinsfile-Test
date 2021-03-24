@@ -6,16 +6,6 @@ pipeline {
         }
     }
     
-    environment {
-        A22_DB_USER_NAME=credentials('test-a22user')
-        PGPASSWORD=credentials('test-a22password')
-        IMPORT_INTERVAL_TIME='60 minute ago'
-        DB_URL='test-pg-bdp.co90ybcr8iim.eu-west-1.rds.amazonaws.com'
-        A22_WS_ENDPOINT=credentials('a22-traffic-endpoint')
-        A22_WS_USER=credentials('a22-traffic-user3')
-        A22_WS_PASSWORD=credentials('a22-traffic-user3-password')
-    }
-
     stages {
         stage('Configure') {
             steps {
@@ -26,26 +16,15 @@ pipeline {
                 sh 'echo "</settings>" >> ~/.m2/settings.xml'
             }
         }
-        stage('create/recreate db'){
-            steps{
-                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} a22db < a22db.sql'
-                sh 'psql -h ${DB_URL} -U ${A22_DB_USER_NAME} -c "insert into a22.a22_webservice(url,username,password) values(\'${A22_WS_ENDPOINT}\',\'${A22_WS_USER}\',\'${A22_WS_PASSWORD}\')" a22db';
-            }
-        }
         stage('Build') {
             steps {
                 sh 'mvn clean package'
             }
         }
-        stage('Import recent data') {
+        stage('Archive') {
             steps {
-                sh '''java -DJDBC_URL='jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD}' -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar interval $(date --date="${IMPORT_INTERVAL_TIME}" \"+%s\") $(date "+%s")'''
-            }
-        }
-
-        stage('Import data and follow') {
-            steps {
-                sh '''java -DJDBC_URL='jdbc:postgresql://${DB_URL}:5432/a22db?user=${A22_DB_USER_NAME}&password=${PGPASSWORD}' -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar follow'''
+                sh 'cp target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar .'
+                archiveArtifacts artifacts: "A22TrafficConnector-1.0.0-jar-with-dependencies.jar", onlyIfSuccessful: true
             }
         }
     }
