@@ -25,7 +25,7 @@ import java.util.HashMap;
  */
 public class Follower {
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     public static void fetchNew(Connector conn, String jdbc_url) throws IOException, ClassNotFoundException, SQLException {
 

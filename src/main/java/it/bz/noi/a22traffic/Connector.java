@@ -22,6 +22,7 @@ import org.json.simple.*;
 public class Connector {
 
     private static final int WS_CONN_TIMEOUT_MSEC = 30000;
+    private static final int WS_READ_TIMEOUT_MSEC = 1800000;
     private static final boolean DEBUG = false;
 
     private String token = null;
@@ -47,6 +48,7 @@ public class Connector {
         conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
         conn.setRequestProperty("Accept", "*/*");
         conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+        conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
         conn.setDoOutput(true);
         OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
         os.write(auth_json + "\n");
@@ -105,6 +107,7 @@ public class Connector {
         conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
         conn.setRequestProperty("Accept", "*/*");
         conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+        conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
         conn.setDoOutput(true);
         OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
         os.write("\n");
@@ -163,6 +166,7 @@ public class Connector {
         conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
         conn.setRequestProperty("Accept", "*/*");
         conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+        conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
         conn.setDoOutput(true);
         OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
         os.write("{\"sessionId\":\"" + token + "\"}\n");
@@ -286,6 +290,7 @@ public class Connector {
             conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
             conn.setRequestProperty("Accept", "*/*");
             conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+            conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
             conn.setDoOutput(true);
             OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
             os.write("{\"request\":{\"sessionId\":\"" + token + "\",\"idspira\":" + coilid + ",\"fromData\":\"/Date(" + frTS + ")/\",\"toData\":\"/Date(" + toTS + ")/\"}}\n");
