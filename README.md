@@ -1,9 +1,9 @@
 
 # A22TrafficConnector
 
-[![ci A22TrafficConnector](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml/badge.svg)](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml)
-
 Retrieve A22 traffic data and store it into a PostgreSQL database.
+
+[![ci A22TrafficConnector](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml/badge.svg)](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml)
 
 ## Purpose
 
