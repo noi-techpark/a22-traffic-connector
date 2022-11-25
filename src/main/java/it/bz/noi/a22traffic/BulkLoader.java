@@ -3,8 +3,8 @@
 
     Retrieve A22 traffic data and store it into a PostgreSQL database.
 
+    (C) 2019-2022 NOI Techpark Südtirol / Alto Adige
     (C) 2018 IDM Suedtirol - Alto Adige
-    (C) 2019 NOI Techpark Südtirol / Alto Adige
 
     Author: Chris Mair - chris@1006.org  
  */

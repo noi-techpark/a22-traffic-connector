@@ -3,8 +3,8 @@
 
     Retrieve A22 traffic data and store it into a PostgreSQL database.
 
+    (C) 2019-2022 NOI Techpark Südtirol / Alto Adige
     (C) 2018 IDM Suedtirol - Alto Adige
-    (C) 2019 NOI Techpark Südtirol / Alto Adige
 
     Author: Chris Mair - chris@1006.org  
  */
@@ -37,7 +37,7 @@ public class Main {
      */
     public static void main(String[] args) throws Exception {
 
-        System.out.println("A22TrafficConnector (20190626) invoked at " + ZonedDateTime.now());
+        System.out.println("A22TrafficConnector (20221124) invoked at " + ZonedDateTime.now());
 
         // ---------------------------------------------------------------------
         // parse and validate arguments
@@ -148,7 +148,7 @@ public class Main {
         // start work according to the selected mode of operation
         if (follow) {
 
-            // enter in an infinite loop, fetching new data (argument "follow")
+            // enter an infinite loop, fetching new data (argument "follow")
             long iteration = 0;
             while (true) {
 
