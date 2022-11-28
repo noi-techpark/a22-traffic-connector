@@ -3,8 +3,8 @@
 
     Retrieve A22 traffic data and store it into a PostgreSQL database.
 
+    (C) 2019-2022 NOI Techpark Südtirol / Alto Adige
     (C) 2018 IDM Suedtirol - Alto Adige
-    (C) 2019 NOI Techpark Südtirol / Alto Adige
 
     Author: Chris Mair - chris@1006.org  
  */
@@ -46,22 +46,36 @@ public class Follower {
         System.out.println("follow mode: number of sensors: " + sensors.size());
 
         // ---------------------------------------------------------------------
-        // for each sensor, perform an insert on conflict do nothing into table a22.a22_station (to store new sensors, if there are any)
-        int new_sensor_count = 0;
-        pst = db.prepareStatement("insert into a22.a22_station (code, name, geo) values (?, ?, ?) on conflict do nothing");
+        // for each sensor
+        //  - perform an insert on conflict into table a22.a22_station to store new sensors,
+        //    if there are any, or to update their name or description,
+        //  - idem for table a22.a22_station_detail, where the raw metadata is stored
+        pst = db.prepareStatement("insert into a22.a22_station (code, name, geo) values (?, ?, ?) on conflict (code) " +
+                " do update set name = ?, geo = ?");
         for (i = 0; i < sensors.size(); i++) {
             pst.setString(1, sensors.get(i).get("stationcode"));
             pst.setString(2, sensors.get(i).get("name"));
             pst.setString(3, sensors.get(i).get("pointprojection"));
+            pst.setString(4, sensors.get(i).get("name"));
+            pst.setString(5, sensors.get(i).get("pointprojection"));
             pst.execute();
-            new_sensor_count += pst.getUpdateCount();
+        }
+        pst.close();
+        pst = db.prepareStatement("insert into a22.a22_station_detail (code, data) values (?, ?) on conflict (code) " +
+                " do update set data = ?");
+        for (i = 0; i < sensors.size(); i++) {
+            pst.setString(1, sensors.get(i).get("stationcode"));
+            pst.setString(2, sensors.get(i).get("raw_metadata"));
+            pst.setString(3, sensors.get(i).get("raw_metadata"));
+            pst.execute();
         }
         pst.close();
         db.commit();
-        System.out.println("follow mode: new sensor count: " + new_sensor_count);
+
+        System.out.println("follow mode: sensor data and metadata updated");
 
         // ---------------------------------------------------------------------
-        // reshape sensors so we get a list of sensors associated to each coilid
+        // reshape sensors, so we get a list of sensors associated to each coilid
         HashMap<String, ArrayList<String>> coils = new HashMap<>();
         for (i = 0; i < sensors.size(); i++) {
             // stationcode = A22:coilid:sensorid

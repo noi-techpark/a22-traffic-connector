@@ -3,8 +3,8 @@
 
     Retrieve A22 traffic data and store it into a PostgreSQL database.
 
+    (C) 2019-2022 NOI Techpark Südtirol / Alto Adige
     (C) 2018 IDM Suedtirol - Alto Adige
-    (C) 2019 NOI Techpark Südtirol / Alto Adige
 
     Author: Chris Mair - chris@1006.org  
  */
@@ -197,11 +197,27 @@ public class Connector {
                 JSONArray sensor_list = (JSONArray) coil.get("sensori");
                 // note sensor_list can be empty (no sensors available)
                 for (j = 0; j < sensor_list.size(); j++) {
+
                     JSONObject sensor = (JSONObject) sensor_list.get(j);
                     HashMap<String, String> h = new HashMap<>();
                     h.put("stationcode", "A22:" + coil.get("idspira") + ":" + sensor.get("idsensore"));
                     h.put("name", coil.get("descrizione") + " (" + getLaneText((Long) sensor.get("idcorsia") + "", (Long) sensor.get("iddirezione") + "") + ")");
                     h.put("pointprojection", "" + coil.get("latitudine") + "," + coil.get("longitudine"));
+
+                    // we also want the raw metadata:
+                    // for each sensor, we add all the common fields (besides "sensori") and the specific fields for this sensor
+                    HashMap<String, String> raw_metadata = new HashMap<>();
+                    for (Object key : coil.keySet()) {
+                        if ("sensori".equals((String)key)) {
+                            continue;
+                        }
+                        raw_metadata.put((String)key, String.valueOf(coil.get((String)key)));
+                    }
+                    for (Object key : sensor.keySet()) {
+                        raw_metadata.put((String)key, String.valueOf(sensor.get((String)key)));
+                    }
+                    h.put("raw_metadata", hashToJSONText(raw_metadata));
+
                     output.add(h);
 
                 }
@@ -342,7 +358,7 @@ public class Connector {
                     h.put("axles", "" + event.get("assi"));
                     h.put("class", "" + event.get("classe"));
                     h.put("direction", "" + event.get("direzione"));
-                    // substring -> see the comment "Reverse engineering the A22 timestamp format" at the end of the file)
+                    // substring -> see the comment "Reverse engineering the A22 timestamp format" at the end of the file
                     h.put("timestamp", ("" + event.get("data")).substring(6, 16));
                     h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
                     output.add(h);
@@ -421,6 +437,22 @@ public class Connector {
         return s;
 
     }
+
+    private static String quoteString(String input) {
+        return "\"" + input.replaceAll("\"", "\\\\\"") + "\"";
+    }
+    private static String hashToJSONText(HashMap<String,String> map) {
+        // sort by key for stable JSON representation
+        StringBuffer ret = new StringBuffer();
+        map.keySet().stream().sorted().forEach(key -> {
+            if (ret.length() != 0) {
+                ret.append(",");
+            }
+            ret.append(quoteString(key)).append(":").append(quoteString(map.get(key)));
+        });
+        return "{" + ret.toString() + "}";
+    }
+
 
     /*
     
