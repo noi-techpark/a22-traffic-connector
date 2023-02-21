@@ -106,7 +106,7 @@ public class Main {
 
         // ---------------------------------------------------------------------
         // read JDBC credentials
-        String jdbc_url = System.getProperty("JDBC_URL");
+        String jdbc_url = System.getenv("JDBC_URL");
         if (jdbc_url == null) {
             System.err.println("ERROR: missing system property JDBC_URL");
             return;
@@ -121,6 +121,8 @@ public class Main {
             Class.forName("org.postgresql.Driver");
             db = DriverManager.getConnection(jdbc_url);
         } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+            System.out.println(jdbc_url);
             System.err.println("ERROR: failed to connect to the database: " + e.getMessage());
             return;
         }

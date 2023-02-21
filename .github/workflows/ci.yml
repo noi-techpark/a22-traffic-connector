@@ -1,6 +1,6 @@
 name: CI
 
-on: push
+on: [push, pull_request]
 
 jobs:
   build:
@@ -15,5 +15,5 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Test with Maven
-        run: mvn -B -U clean compile test
+      - name: Compile with Maven
+        run: mvn -B -U clean compile

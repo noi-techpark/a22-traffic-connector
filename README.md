@@ -12,37 +12,36 @@ events registered by the traffic sensors along the A22 toll way and store them i
 a PostgreSQL database.
 
 ## Requirements
-
-- A PostgreSQL database of at least version 9.5, initialized with `a22db.sql`.
 - A JDK (at least version 8).
-- Maven.
-- URL and credentials to access the A22 web service. This must be stored in the table `a22.a22_webservice` at id = 1.
+- Postgresql database initialized with the a22db_* scripts
+- URL and credentials to access the A22 web service. This must be stored in the table `a22.a22_webservice` at id = 1. This is not needed if you point to an existing remote database
+
+- If you use docker, you only need the webservice credentials
 
 ## Building
-
-Run
+to build locally via maven:
 
 ```
 mvn package
 ```
 
-to download the dependencies (PostgreSQL JDBC driver and json-simple) and build the application jar file.
-
 ## Running
+
+### Standalone
 
 The application can be called as a JAR:
 
 ```
-java -DJDBC_URL=<jdbc_url> -jar target/A22TrafficConnector-1.0.0-jar-with-dependencies.jar <arguments>
+java -jar target/app.jar <arguments>
 ```
 
-where `<jdbc_url>` has the form
+An environment variable `JDBC_URL` must be set to configure the DB connection.  
 
 ```
-jdbc:postgresql://host/dbname?user=******&password=*****
+JDBC_URL=jdbc:postgresql://host/dbname?user=******&password=*****
 ```
 
-and `<argument>` specifies the operation mode and parameters:
+`<argument>` specifies the operation mode and parameters:
 
 ```
 { month <year> <month> | interval <start_ts> <end_ts> | follow }
@@ -66,6 +65,26 @@ $ date -d "Mon Apr  1 00:00:00 UTC 2019" +%s
 $ date -d "Wed May  1 00:00:00 UTC 2019" +%s
 1556668800
 ```
+
+### Run using Docker compose
+Create a local `.env` by copying `.env.example` and modify the configuration to your needs. 
+```
+$ docker-compose up
+```
+
+This starts a local Postgresql instance and initializes the schema.  
+If you leave the default JDBC connection string in `.env`, the data collector runs using this local postgres DB  
+
+If you change the webservice credentials or want to reset the data, delete the `db/` folder
+
+If you run using an existing DB, use
+```
+$ docker-compose up app
+```
+instead. This avoids spinning up the local DB
+
+The default mode is `follow`.  
+To run in `bulk` mode supply the necessary arguments in the `.env` file
 
 ### Running in bulk mode
 

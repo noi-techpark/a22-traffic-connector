@@ -1,0 +1,41 @@
+version: "3.4"
+
+services:
+  app:
+    image: maven:3-jdk-8-alpine
+    env_file:
+      - .env
+    environment:
+      MAVEN_CONFIG: /var/maven/.m2
+      MAVEN_OPTS: -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=9000
+    entrypoint: > 
+      mvn 
+        -Duser.home=/var/maven
+        exec:java
+        -Dexec.args="${OPERATION_MODE}"
+    ports:
+      - 9000:9000
+      - 9001:9001
+    volumes:
+      - ~/.m2/:/var/maven/.m2
+      - ./:/code
+    working_dir: /code
+    depends_on:
+      - db
+    tty: true
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 5432:5432
+    volumes:
+      - ./db/:/var/lib/postgresql/data
+      - ./a22db.sql:/docker-entrypoint-initdb.d/1_create_schema.sql
+      - ./a22db_station_detail.sql:/docker-entrypoint-initdb.d/2_station_detail.sql
+      - ./a22db_insert_webservice.sh:/docker-entrypoint-initdb.d/3_insert_webservice.sh
