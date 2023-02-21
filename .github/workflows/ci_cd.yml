@@ -24,7 +24,7 @@ jobs:
           X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
           X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_JAVA_OPTIONS: -Xms128m -Xmx512m
+          X_JAVA_OPTIONS: -Xms128m -Xmx2048m
           X_JDBC_URL: ${{ secrets.TEST_JDBC_URL }}
       - name: Build project
         uses: noi-techpark/github-actions/maven-build@v2
@@ -64,7 +64,7 @@ jobs:
           X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
           X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_JAVA_OPTIONS: -Xms128m -Xmx512m
+          X_JAVA_OPTIONS: -Xms128m -Xmx2048m
           X_JDBC_URL: ${{ secrets.PROD_JDBC_URL }}
       - name: Build project
         uses: noi-techpark/github-actions/maven-build@v2
