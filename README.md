@@ -8,7 +8,7 @@ SPDX-License-Identifier: CC0-1.0
 
 Retrieve A22 traffic data and store it into a PostgreSQL database.
 
-![REUSE Compliance](https://github.com/noi-techpark/a22-traffic-connector/actions/workflows/reuse.yml/badge.svg)
+[![REUSE Compliance](https://github.com/noi-techpark/a22-traffic-connector/actions/workflows/reuse.yml/badge.svg)](https://github.com/noi-techpark/odh-docs/wiki/REUSE#badges)
 [![ci A22TrafficConnector](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml/badge.svg)](https://github.com/noi-techpark/A22TrafficConnector/actions/workflows/ci.yml)
 
 ## Purpose
