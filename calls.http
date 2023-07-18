@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# works with REST Client for VSCodium/VSCode
+# https://open-vsx.org/extension/humao/rest-client
+
+@host={{$dotenv A22_URL}}
+@username={{$dotenv A22_USERNAME}}
+@password={{$dotenv A22_PASSWORD}}
+
+
+### CREATE ACCESS TOKEN
+# @name auth
+POST {{host}}/token
+User-Agent: IDM/traffic_a22
+Accept: */*
+Content-Type: application/json
+
+{
+    "request":
+    {
+        "username":"{{username}}",
+        "password": "{{password}}"
+    }
+}
+
+###
+@token = {{auth.response.body.SubscribeResult.sessionId}}
+
+
+### DELETE ACCESS TOKEN
+# @name deauth
+DELETE {{host}}/token/{{token}}
+User-Agent: IDM/traffic_a22
+Accept: */*
+Content-Type: application/json
+
+
+### /traffico/anagrafica
+POST {{host}}/traffico/anagrafica
+User-Agent: IDM/traffic_a22
+Accept: */*
+Content-Type: application/json
+
+{
+    "sessionId": "{{token}}"
+}
+
+
+### /traffico/transiti
+# idspira from previous call
+@idspira = 5419
+@fromData = 1689662955000
+@toData = 1689672576999
+
+POST {{host}}/traffico/transiti
+User-Agent: IDM/traffic_a22
+Accept: */*
+Content-Type: application/json
+
+{
+    "request": 
+    {
+        "sessionId": "{{token}}",
+        "idspira": {{idspira}},
+        "fromData" : "/Date({{fromData}}+0200)/",
+        "toData" : "/Date({{toData}}+0200)/"
+    }
+}
