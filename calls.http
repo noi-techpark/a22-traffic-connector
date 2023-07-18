@@ -51,8 +51,8 @@ Content-Type: application/json
 ### /traffico/transiti
 # idspira from previous call
 @idspira = 5419
-@fromData = 1689662955000
-@toData = 1689672576999
+@fromData = 1689067906
+@toData = 1689068446
 
 POST {{host}}/traffico/transiti
 User-Agent: IDM/traffic_a22
@@ -64,7 +64,7 @@ Content-Type: application/json
     {
         "sessionId": "{{token}}",
         "idspira": {{idspira}},
-        "fromData" : "/Date({{fromData}}+0200)/",
-        "toData" : "/Date({{toData}}+0200)/"
+        "fromData" : "/Date({{fromData}}000+0200)/",
+        "toData" : "/Date({{toData}}999+0200)/"
     }
 }
