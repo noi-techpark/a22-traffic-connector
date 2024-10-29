@@ -183,8 +183,8 @@ public class Follower {
 
         pst = db.prepareStatement(
                 "insert into a22.a22_traffic "
-                + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction) "
-                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction, country, license_plate_initials) "
+                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         for (i = 0; i < res.size(); i++) {
             String s = res.get(i).get("stationcode");
             if (!sensor_known.containsKey(s)) {
@@ -200,6 +200,8 @@ public class Follower {
             pst.setInt(8, Integer.parseInt(res.get(i).get("class")));
             pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
             pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
+            pst.setInt(11, Integer.parseInt(res.get(i).get("country")));
+            pst.setString(12, res.get(i).get("license_plate_initials"));
             pst.execute();
         }
         pst.close();

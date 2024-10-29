@@ -54,7 +54,9 @@ CREATE TABLE a22.a22_traffic (
     against_traffic boolean,
     class integer,
     speed double precision,
-    direction integer
+    direction integer,
+    country int2,
+    license_plate_initials text
 );
 
 CREATE INDEX a22_traffic_stationcode_ix ON a22.a22_traffic USING btree (stationcode);

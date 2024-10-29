@@ -82,8 +82,8 @@ public class BulkLoader implements Runnable {
                 db.setAutoCommit(false);
                 PreparedStatement ins = db.prepareStatement(
                         "insert into a22.a22_traffic "
-                        + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction, country, license_plate_initials) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 for (int i = 0; i < res.size(); i++) {
                     ins.setString(1, res.get(i).get("stationcode"));
                     ins.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
@@ -95,6 +95,8 @@ public class BulkLoader implements Runnable {
                     ins.setInt(8, Integer.parseInt(res.get(i).get("class")));
                     ins.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
                     ins.setInt(10, Integer.parseInt(res.get(i).get("direction")));
+                    ins.setInt(11, Integer.parseInt(res.get(i).get("country")));
+                    ins.setString(12, res.get(i).get("license_plate_initials"));
                     ins.execute();
                 }
                 ins.close();

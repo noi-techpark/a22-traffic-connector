@@ -362,6 +362,8 @@ public class Connector {
                     h.put("axles", "" + event.get("assi"));
                     h.put("class", "" + event.get("classe"));
                     h.put("direction", "" + event.get("direzione"));
+                    h.put("country", "" + event.get("idNazionalita"));
+                    h.put("license_plate_initials", "" + event.get("targaIniziali"));
                     // substring -> see the comment "Reverse engineering the A22 timestamp format" at the end of the file
                     h.put("timestamp", ("" + event.get("data")).substring(6, 16));
                     h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
