@@ -10,6 +10,7 @@ env:
 
 jobs:
 
+  # TODO: disable again
   # Disable test deployment, because heavy on database and docker resources
   # Enable again if test environment is needed
 
