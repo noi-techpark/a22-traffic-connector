@@ -95,7 +95,8 @@ public class BulkLoader implements Runnable {
                     ins.setInt(8, Integer.parseInt(res.get(i).get("class")));
                     ins.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
                     ins.setInt(10, Integer.parseInt(res.get(i).get("direction")));
-                    ins.setInt(11, Integer.parseInt(res.get(i).get("country")));
+                    String country = res.get(i).get("country");
+                    ins.setInt(11, country != null ? Integer.parseInt(country) : null);
                     ins.setString(12, res.get(i).get("license_plate_initials"));
                     ins.execute();
                 }
