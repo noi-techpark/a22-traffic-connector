@@ -201,7 +201,7 @@ public class Follower {
             pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
             pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
             String country = res.get(i).get("country");
-            pst.setInt(11, country != null ? Integer.parseInt(country) : null);
+            pst.setInt(11, !country.equals("null") ? Integer.parseInt(country) : null);
             pst.setString(12, res.get(i).get("license_plate_initials"));
             pst.execute();
         }
