@@ -207,7 +207,7 @@ public class Follower {
             } catch (NullPointerException | NumberFormatException e) {
                 pst.setObject(11, null, Types.INTEGER);
             }
-            pst.setString(12, res.get(i).get("license_plate_initials"));
+            pst.setString(12, "".equals(res.get(i).get("license_plate_initials")) ? null: res.get(i).get("license_plate_initials"));
             pst.execute();
         }
         pst.close();

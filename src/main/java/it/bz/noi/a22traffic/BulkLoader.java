@@ -102,7 +102,7 @@ public class BulkLoader implements Runnable {
                     } catch (NullPointerException | NumberFormatException e) {
                         ins.setObject(11, null, Types.INTEGER);
                     }
-                    ins.setString(12, res.get(i).get("license_plate_initials"));
+                    ins.setString(12, "".equals(res.get(i).get("license_plate_initials")) ? null: res.get(i).get("license_plate_initials"));
                     ins.execute();
                 }
                 ins.close();
