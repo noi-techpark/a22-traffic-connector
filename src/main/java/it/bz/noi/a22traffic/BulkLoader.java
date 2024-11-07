@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -95,8 +96,12 @@ public class BulkLoader implements Runnable {
                     ins.setInt(8, Integer.parseInt(res.get(i).get("class")));
                     ins.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
                     ins.setInt(10, Integer.parseInt(res.get(i).get("direction")));
-                    String country = res.get(i).get("country");
-                    ins.setInt(11, !country.equals("null") ? Integer.parseInt(country) : null);
+                    try {
+                        String country = res.get(i).get("country");
+                        ins.setInt(11, Integer.parseInt(country));
+                    } catch (NullPointerException | NumberFormatException e) {
+                        ins.setObject(11, null, Types.INTEGER);
+                    }
                     ins.setString(12, res.get(i).get("license_plate_initials"));
                     ins.execute();
                 }

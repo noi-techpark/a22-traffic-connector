@@ -20,6 +20,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -200,8 +201,12 @@ public class Follower {
             pst.setInt(8, Integer.parseInt(res.get(i).get("class")));
             pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
             pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
-            String country = res.get(i).get("country");
-            pst.setInt(11, !country.equals("null") ? Integer.parseInt(country) : null);
+            try {
+                String country = res.get(i).get("country");
+                pst.setInt(11, Integer.parseInt(country));
+            } catch (NullPointerException | NumberFormatException e) {
+                pst.setObject(11, null, Types.INTEGER);
+            }
             pst.setString(12, res.get(i).get("license_plate_initials"));
             pst.execute();
         }
