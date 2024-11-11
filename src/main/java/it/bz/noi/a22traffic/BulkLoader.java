@@ -23,6 +23,7 @@ import java.sql.Types;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A22 traffic API connector: runnable for bulk operations (arguments "month" or "interval").
@@ -60,6 +61,8 @@ public class BulkLoader implements Runnable {
             ArrayList<HashMap<String, String>> sensors = conn.getTrafficSensors();
             System.out.println("th" + thread_num + " number of sensors: " + sensors.size());
 
+            Map<String, String> countries = conn.getCountries();
+
             // ---------------------------------------------------------------------
             // perform getVehicles() operation in batches of 1000 seconds each
             long batch = epoch_start;
@@ -67,7 +70,6 @@ public class BulkLoader implements Runnable {
             ArrayList<HashMap<String, String>> res;
 
             while (batch < epoch_end - 1) {
-
                 long fr = batch;
                 long to = Math.min(epoch_end - 1, batch + 999);
 
@@ -96,15 +98,11 @@ public class BulkLoader implements Runnable {
                     ins.setInt(8, Integer.parseInt(res.get(i).get("class")));
                     ins.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
                     ins.setInt(10, Integer.parseInt(res.get(i).get("direction")));
-                    try {
-                        String country = res.get(i).get("country");
-                        ins.setInt(11, Integer.parseInt(country));
-                    } catch (NullPointerException | NumberFormatException e) {
-                        ins.setObject(11, null, Types.INTEGER);
-                    }
+                    ins.setString(11, countries.get(res.get(i).get("country")));
                     ins.setString(12, "".equals(res.get(i).get("license_plate_initials")) ? null: res.get(i).get("license_plate_initials"));
-                    ins.execute();
+                    ins.addBatch();
                 }
+                ins.executeBatch();
                 ins.close();
                 db.commit();
 

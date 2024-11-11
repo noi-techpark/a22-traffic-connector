@@ -47,12 +47,22 @@ Content-Type: application/json
     "sessionId": "{{token}}"
 }
 
+### /traffico/nazionalita
+POST {{host}}/traffico/nazionalita
+User-Agent: IDM/traffic_a22
+Accept: */*
+Content-Type: application/json
+
+{
+    "sessionId": "{{token}}"
+}
+
 
 ### /traffico/transiti
 # idspira from previous call
-@idspira = 5419
-@fromData = 1689067906
-@toData = 1689068446
+@idspira = 6156
+@fromData = 1730727390
+@toData = 1730737390
 
 POST {{host}}/traffico/transiti
 User-Agent: IDM/traffic_a22

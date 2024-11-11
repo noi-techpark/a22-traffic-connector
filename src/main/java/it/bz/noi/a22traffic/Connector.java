@@ -90,7 +90,6 @@ public class Connector {
         token = session_id;
 
         System.out.println("auth OK, new token = " + token.replaceAll(".{12}$", "************") + ", time = " + ZonedDateTime.now());
-
     }
 
     /**
@@ -148,6 +147,68 @@ public class Connector {
 
         token = null;
 
+    }
+
+    /**
+     * Retrieve the list of countries
+     *
+     * @return a Map of country codes by ID
+     *
+     * @throws IOException
+     */
+    public Map<String, String> getCountries() throws IOException {
+        if (url == null || token == null) {
+            throw new RuntimeException("there is no authenticated session");
+        }
+
+        // make request
+        HttpURLConnection conn = (HttpURLConnection) (new URL(url + "/traffico/nazionalita")).openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
+        conn.setRequestProperty("Accept", "*/*");
+        conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+        conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
+        conn.setDoOutput(true);
+        OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
+        os.write("{\"sessionId\":\"" + token + "\"}\n");
+        os.flush();
+        int status = conn.getResponseCode();
+        if (status != 200) {
+            throw new RuntimeException("could not retrieve nationality list (response code was " + status + ")");
+        }
+
+        // get response
+        BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+        StringBuilder response = new StringBuilder();
+        String s;
+        while ((s = br.readLine()) != null) {
+            response.append(s);
+        }
+        os.close();
+        conn.disconnect();
+
+        // parse response 
+        HashMap<String, String> output = new HashMap<>();
+        try {
+            JSONObject response_json = (JSONObject) JSONValue.parse(response.toString());
+            JSONArray nationalities = (JSONArray) response_json.get("Traffico_GetNazionalitaResult");
+            for (Object o : nationalities) {
+                JSONObject n = (JSONObject) o;
+                String id = "" + n.get("Id");
+                String code = "" + n.get("Sigla");
+                output.put(id, code);
+            }
+        } catch (Exception e) {
+            // null pointer or cast exception in case the json hasn't the expected form
+            throw new RuntimeException("could not parse nationality list");
+        }
+
+        if (DEBUG) {
+            System.out.println("getTrafficSensors - got list of " + output.size() + " sensors");
+        }
+
+        return output;
     }
 
     /**
@@ -236,9 +297,7 @@ public class Connector {
         }
 
         return output;
-
     }
-
     /**
      * Retrieve the list of vehicle transit events for all known sensors.
      *
@@ -331,19 +390,12 @@ public class Connector {
                 continue;
             }
 
-            // get response
-            BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
-            StringBuilder response = new StringBuilder();
-            String s;
-            while ((s = br.readLine()) != null) {
-                response.append(s);
-            }
-            os.close();
-            conn.disconnect();
-
             // parse response 
             try {
-                JSONObject response_json = (JSONObject) JSONValue.parse(response.toString());
+                JSONObject response_json = (JSONObject) JSONValue.parse(new InputStreamReader(conn.getInputStream()));
+                os.close();
+                conn.disconnect();
+
                 JSONArray event_list = (JSONArray) response_json.get("Traffico_GetTransitiResult");
 
                 if (DEBUG) {
