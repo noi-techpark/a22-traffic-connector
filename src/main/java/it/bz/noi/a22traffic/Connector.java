@@ -450,6 +450,9 @@ public class Connector {
 
         String s = "corsia di ";
 
+        // This is tricker than it looks:
+        // Older sensor types use all 6 cases, depending on lane direction e.g. 5 is emergency lane direction nord, 6 is direction south
+        // but newer CCTV camera types only use 1 and 2, irregardless of direction
         switch (lane) {
             case "1":
                 s += "marcia";
