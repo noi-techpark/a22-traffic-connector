@@ -452,22 +452,22 @@ public class Connector {
 
         switch (lane) {
             case "1":
-                s += "marcia nord";
+                s += "marcia";
                 break;
             case "2":
-                s += "sorpasso nord";
+                s += "sorpasso";
                 break;
             case "3":
-                s += "marcia sud";
+                s += "marcia";
                 break;
             case "4":
-                s += "sorpasso sud";
+                s += "sorpasso";
                 break;
             case "5":
-                s += "emergenza nord";
+                s += "emergenza";
                 break;
             case "6":
-                s += "emergenza sud";
+                s += "emergenza";
                 break;
             default:
                 s += "n/a";
