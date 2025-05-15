@@ -35,13 +35,16 @@ public class BulkLoader implements Runnable {
     private final Connector conn;
     private final long epoch_start;
     private final long epoch_end;
+    private final Map<String, long[]> load_result;
 
-    public BulkLoader(int thread_num, String jdbc_url, Connector conn, long epoch_start, long epoch_end) {
+    public BulkLoader(int thread_num, String jdbc_url, Connector conn, 
+        long epoch_start, long epoch_end, Map<String, long[]> load_result) {
         this.thread_num = thread_num;
         this.jdbc_url = jdbc_url;
         this.conn = conn;
         this.epoch_start = epoch_start;
         this.epoch_end = epoch_end;
+        this.load_result = load_result;
     }
 
     @Override
@@ -88,7 +91,16 @@ public class BulkLoader implements Runnable {
                         + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction, country, license_plate_initials) "
                         + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 for (int i = 0; i < res.size(); i++) {
-                    ins.setString(1, res.get(i).get("stationcode"));
+                    // min and max timestamp handling
+                    String stationcode = res.get(i).get("stationcode");
+                    long ts = Long.parseLong(res.get(i).get("timestamp"));
+
+                    long[] bounds = this.load_result.getOrDefault(stationcode, new long[] { Long.MAX_VALUE, Long.MIN_VALUE });
+                    bounds[0] = Math.min(bounds[0], ts);  // min timestamp
+                    bounds[1] = Math.max(bounds[1], ts);  // max timestamp
+                    this.load_result.put(stationcode, bounds);
+                    
+                    ins.setString(1, stationcode);
                     ins.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
                     ins.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
                     ins.setDouble(4, Double.parseDouble(res.get(i).get("headway")));

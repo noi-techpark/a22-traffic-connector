@@ -197,6 +197,12 @@ public class Main {
             long delta = (epoch_end - epoch_start) / thread_count;
             long first, last;
 
+            // prepare an hashmap for each thread to yield min and max timestamps
+            List<Map<String, long[]>> threadResults = new ArrayList<>();
+            for (int j = 0; j < thread_count; j++) {
+                threadResults.add(new HashMap<>());
+            }
+
             Runnable bulkloader[] = new Runnable[thread_count];
             Thread thread[] = new Thread[thread_count];
             for (i = 0; i < thread_count; i++) {
@@ -206,7 +212,7 @@ public class Main {
                 } else {
                     last = epoch_end;
                 }
-                bulkloader[i] = new BulkLoader(i, jdbc_url, conn, first, last);
+                bulkloader[i] = new BulkLoader(i, jdbc_url, conn, first, last, threadResults.get(i));
                 thread[i] = new Thread(bulkloader[i]);
                 thread[i].start();
             }
@@ -218,6 +224,8 @@ public class Main {
             // disconnect from A22 service
             conn.close();
 
+            // flush min and max timestamps
+            Stations.updateStationTimestampsBulk(jdbc_url, threadResults);
         }
 
         System.out.println("A22TrafficConnector exited at " + ZonedDateTime.now());

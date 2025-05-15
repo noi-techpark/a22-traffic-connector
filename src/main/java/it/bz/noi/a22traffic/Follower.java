@@ -178,6 +178,7 @@ public class Follower {
         
         System.out.println("follow mode: getting events:");
 
+        Map<String, long[]> stationTimeBounds = new HashMap<>();
         Map<String, String> countries = conn.getCountries();
         res = conn.getVehicles(0, 0, Instant.now().getEpochSecond(), sensors, coils_ts);
 
@@ -192,7 +193,17 @@ public class Follower {
             if (!sensor_known.containsKey(s)) {
                 detected_ghosts.put(s, 1);
             }
-            pst.setString(1, res.get(i).get("stationcode"));
+
+            // min and max timestamp handling
+            String stationcode = res.get(i).get("stationcode");
+            long ts = Long.parseLong(res.get(i).get("timestamp"));
+
+            long[] bounds = stationTimeBounds.getOrDefault(stationcode, new long[] { Long.MAX_VALUE, Long.MIN_VALUE });
+            bounds[0] = Math.min(bounds[0], ts);  // min timestamp
+            bounds[1] = Math.max(bounds[1], ts);  // max timestamp
+            stationTimeBounds.put(stationcode, bounds);
+            
+            pst.setString(1, stationcode);
             pst.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
             pst.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
             pst.setDouble(4, Double.parseDouble(res.get(i).get("headway")));
@@ -219,6 +230,9 @@ public class Follower {
         }
         pst.close();
         db.commit();
+
+        // flush min and max timestamps
+        Stations.updateStationTimestamps(jdbc_url, stationTimeBounds);
         
         System.out.println("follow mode: " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms), new ghost sensors detected: " + detected_ghosts.size());
 

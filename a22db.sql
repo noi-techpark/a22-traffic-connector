@@ -20,7 +20,9 @@ CREATE SCHEMA a22;
 CREATE TABLE a22.a22_station (
     code text primary key,
     name text NOT NULL,
-    geo text NOT NULL
+    geo text NOT NULL,
+    min_timestamp integer,
+    max_timestamp integer
 );
 
 
