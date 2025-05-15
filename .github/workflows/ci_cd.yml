@@ -16,7 +16,7 @@ jobs:
 
   # Deploy Test
   deploy-test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
     concurrency: deploy-test
     steps:
@@ -61,7 +61,7 @@ jobs:
 
   # Deploy Prod
   deploy-prod:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/prod'
     concurrency: deploy-prod
     steps:
