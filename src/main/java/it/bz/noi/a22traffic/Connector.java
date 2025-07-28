@@ -27,7 +27,7 @@ public class Connector {
 
     private static final int WS_CONN_TIMEOUT_MSEC = 30000;
     private static final int WS_READ_TIMEOUT_MSEC = 1800000;
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     private String token = null;
     private String url = null;
