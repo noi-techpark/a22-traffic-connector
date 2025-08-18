@@ -10,7 +10,7 @@
     (C) 2019-2022 NOI Techpark Südtirol / Alto Adige
     (C) 2018 IDM Suedtirol - Alto Adige
 
-    Author: Chris Mair - chris@1006.org  
+    Author: Chris Mair - chris@1006.org
  */
 package it.bz.noi.a22traffic;
 
@@ -30,21 +30,15 @@ public class Connector {
     private static final boolean DEBUG = true;
 
     private String token = null;
-    private String url = null;
+    private final String url;
+    private final String auth_json; // Store auth details for re-authentication
 
     /**
-     * Get authentication token and store it.
-     *
-     * @param url - the A22 web service URL
-     * @param auth_json - the authentication String with user/pass in JSON
+     * Authenticates and stores the session token.
      *
      * @throws java.io.IOException
-     *
      */
-    public Connector(String url, String auth_json) throws IOException {
-
-        this.url = url;
-
+    private void authenticate() throws IOException {
         // make authentication request
         HttpURLConnection conn = (HttpURLConnection) (new URL(url + "/token")).openConnection();
         conn.setRequestMethod("POST");
@@ -55,7 +49,7 @@ public class Connector {
         conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
         conn.setDoOutput(true);
         OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
-        os.write(auth_json + "\n");
+        os.write(this.auth_json + "\n");
         os.flush();
         int status = conn.getResponseCode();
         if (status != 200) {
@@ -87,9 +81,24 @@ public class Connector {
             throw new RuntimeException("authentication failure (could not find sessionId in response)");
         }
 
-        token = session_id;
+        this.token = session_id;
+        System.out.println("auth OK, new token = " + this.token.replaceAll(".{12}$", "************") + ", time = " + ZonedDateTime.now());
+    }
 
-        System.out.println("auth OK, new token = " + token.replaceAll(".{12}$", "************") + ", time = " + ZonedDateTime.now());
+
+    /**
+     * Get authentication token and store it.
+     *
+     * @param url - the A22 web service URL
+     * @param auth_json - the authentication String with user/pass in JSON
+     *
+     * @throws java.io.IOException
+     *
+     */
+    public Connector(String url, String auth_json) throws IOException {
+        this.url = url;
+        this.auth_json = auth_json;
+        this.authenticate(); // Initial authentication
     }
 
     /**
@@ -130,7 +139,7 @@ public class Connector {
         os.close();
         conn.disconnect();
 
-        // parse response 
+        // parse response
         Boolean result = null;
         try {
             JSONObject response_json = (JSONObject) JSONValue.parse(response.toString());
@@ -188,7 +197,7 @@ public class Connector {
         os.close();
         conn.disconnect();
 
-        // parse response 
+        // parse response
         HashMap<String, String> output = new HashMap<>();
         try {
             JSONObject response_json = (JSONObject) JSONValue.parse(response.toString());
@@ -251,7 +260,7 @@ public class Connector {
         os.close();
         conn.disconnect();
 
-        // parse response 
+        // parse response
         ArrayList<HashMap<String, String>> output = new ArrayList<>();
         try {
             JSONObject response_json = (JSONObject) JSONValue.parse(response.toString());
@@ -302,15 +311,15 @@ public class Connector {
      * Retrieve the list of vehicle transit events for all known sensors.
      *
      * @param thread_num thread number, just for debug prints
-     * 
+     *
      * @param fr search events from this timestamp (Unix epoch in UTC)
      *
      * @param to search events up to *and* *including* this timestamp (Unix epoch in UTC)
      *
      * @param sensors list of sensors as returned by getTrafficSensors() or null (to get them all)
-     * 
+     *
      * @param coils_fr if this is not null, then it overrides parameter fr (this is *per* coil_id)
-     * 
+     *
      *
      * @return an ArrayList of HashMaps with the vehicle transit event info
      *
@@ -356,83 +365,103 @@ public class Connector {
             if (coils_fr != null) {
                 if (coils_fr.get(coilid) == null) {
                     throw new RuntimeException("got per coil from timestamps, but cannot find coil id '" + coilid + "'");
-                } 
+                }
                 frTS = coils_fr.get(coilid) + "000+0000";
             }
-            if (DEBUG) {
-                System.out.println("getVehicles is retrieving vehicle transit events for coil ID " + coilid + " interval " + frTS + " - " + toTS);
-            }
-            // make request
-            HttpURLConnection conn = (HttpURLConnection) (new URL(url + "/traffico/transiti")).openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
-            conn.setRequestProperty("Accept", "*/*");
-            conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
-            conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
-            conn.setDoOutput(true);
-            OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
-            os.write("{\"request\":{\"sessionId\":\"" + token + "\",\"idspira\":" + coilid + ",\"fromData\":\"/Date(" + frTS + ")/\",\"toData\":\"/Date(" + toTS + ")/\"}}\n");
-            os.flush();
-            int status = conn.getResponseCode();
-            if (http_codes.containsKey(status)) {
-                http_codes.put(status, http_codes.get(status) + 1);
-            } else {
-                http_codes.put(status, 1);
-            }
-            if (status != 200) {
+            
+            final int MAX_RETRIES = 10;
+            for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                 if (DEBUG) {
-                    System.out.println("    +- skipping (response status was " + status + ")");
-                }
-                // note requesting data for coil IDs that are not present at the required timestamps will
-                // return status 500 (this has been confirmed with the developer of the web service);
-                // if we get a non-200 response, we just skip it
-                continue;
-            }
-
-            // parse response 
-            try {
-                JSONObject response_json = (JSONObject) JSONValue.parse(new InputStreamReader(conn.getInputStream()));
-                os.close();
-                conn.disconnect();
-
-                JSONArray event_list = (JSONArray) response_json.get("Traffico_GetTransitiResult");
-
-                if (DEBUG) {
-                    System.out.println("    +- got " + event_list.size() + " events");
+                    System.out.println("getVehicles is retrieving vehicle transit events for coil ID " + coilid + " interval " + frTS + " - " + toTS + ". Attempt " + attempt + "/" + MAX_RETRIES);
                 }
 
-                int i, j;
-                for (i = 0; i < event_list.size(); i++) {
-                    JSONObject event = (JSONObject) event_list.get(i);
-                    HashMap<String, String> h = new HashMap<>();
-                    h.put("stationcode", "A22:" + event.get("idspira") + ":" + event.get("idsensore"));
-                    h.put("distance", "" + event.get("distanza"));
-                    h.put("headway", "" + event.get("avanzamento"));
-                    h.put("speed", "" + event.get("velocita"));
-                    h.put("length", "" + event.get("lunghezza"));
-                    h.put("axles", "" + event.get("assi"));
-                    h.put("class", "" + event.get("classe"));
-                    h.put("direction", "" + event.get("direzione"));
-                    h.put("country", "" + event.get("idNazionalita"));
-                    h.put("license_plate_initials", "" + event.get("targaIniziali"));
-                    // substring -> see the comment "Reverse engineering the A22 timestamp format" at the end of the file
-                    h.put("timestamp", ("" + event.get("data")).substring(6, 16));
-                    h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
-                    output.add(h);
+                HttpURLConnection conn = null;
+                try {
+                    // make request
+                    conn = (HttpURLConnection) (new URL(url + "/traffico/transiti")).openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
+                    conn.setRequestProperty("Accept", "*/*");
+                    conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+                    conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
+                    conn.setDoOutput(true);
+                    OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
+                    os.write("{\"request\":{\"sessionId\":\"" + token + "\",\"idspira\":" + coilid + ",\"fromData\":\"/Date(" + frTS + ")/\",\"toData\":\"/Date(" + toTS + ")/\"}}\n");
+                    os.flush();
+
+                    int status = conn.getResponseCode();
+                    http_codes.put(status, http_codes.getOrDefault(status, 0) + 1);
+
+                    if (status == 401) {
+                        // --- AUTHENTICATION ERROR ---
+                        System.err.println("WARN: Received 401 Unauthorized for coil ID " + coilid + ". Attempt " + attempt + "/" + MAX_RETRIES + ". Re-authenticating...");
+                        if (attempt == MAX_RETRIES) {
+                             System.err.println("ERROR: Authentication failed after " + MAX_RETRIES + " attempts. Skipping coil " + coilid + ".");
+                             break; // Give up
+                        }
+                        this.authenticate(); // Get a new token
+
+                        try {
+                            Thread.sleep(25L * attempt); // Sleep with increasing delay
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        // Continue to next attempt
+                        continue;
+                    } else if (status != 200) {
+                        // --- OTHER ERRORS ---
+                        if (DEBUG) {
+                            System.out.println("    +- skipping (response status was " + status + ")");
+                        }
+                        // For other errors (e.g., 500), break the retry loop and skip this coil
+                        break;
+                    }
+                
+                    // --- SUCCESS ---
+                    JSONObject response_json = (JSONObject) JSONValue.parse(new InputStreamReader(conn.getInputStream()));
+                    os.close();
+
+                    JSONArray event_list = (JSONArray) response_json.get("Traffico_GetTransitiResult");
+                    if (DEBUG) {
+                        System.out.println("    +- got " + event_list.size() + " events");
+                    }
+                    for (Object event_obj : event_list) {
+                        JSONObject event = (JSONObject) event_obj;
+                        HashMap<String, String> h = new HashMap<>();
+                        h.put("stationcode", "A22:" + event.get("idspira") + ":" + event.get("idsensore"));
+                        h.put("distance", "" + event.get("distanza"));
+                        h.put("headway", "" + event.get("avanzamento"));
+                        h.put("speed", "" + event.get("velocita"));
+                        h.put("length", "" + event.get("lunghezza"));
+                        h.put("axles", "" + event.get("assi"));
+                        h.put("class", "" + event.get("classe"));
+                        h.put("direction", "" + event.get("direzione"));
+                        h.put("country", "" + event.get("idNazionalita"));
+                        h.put("license_plate_initials", "" + event.get("targaIniziali"));
+                        h.put("timestamp", ("" + event.get("data")).substring(6, 16));
+                        h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
+                        output.add(h);
+                    }
+                    
+                } catch (Exception e) {
+                    // null pointer or cast exception in case the json hasn't the expected form
+                    e.printStackTrace();
+                    throw new RuntimeException("could not parse vehicle transit events");
+                } finally {
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
                 }
-            } catch (Exception e) {
-                // null pointer or cast exception in case the json hasn't the expected form
-                e.printStackTrace();
-                throw new RuntimeException("could not parse vehicle transit events");
-            }
 
-            try {
-                Thread.sleep(25); // sleep a bit to avoid overloading the server
-            } catch (InterruptedException ex) {
+                try {
+                    Thread.sleep(25); // sleep a bit to avoid overloading the server
+                    break; // Success, exit retry loop
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
             }
-
-        } // for coilid 
+        } // for coilid
 
         if (DEBUG) {
             System.out.println("getVehicles summary - coils: " + coils.keySet().size() + ", sensors: " + sensors.size() + ", transit events: " + output.size());
@@ -516,7 +545,7 @@ public class Connector {
 
 
     /*
-    
+
     Reverse engineering the A22 timestamp format
     --------------------------------------------
 
@@ -537,7 +566,7 @@ public class Connector {
     /Date(1540688648000+0100)/
     /Date(1540688656000+0100)/
     [...]
-    
+
     /Date(1540688390000+0200)/
 
         $ date --date='@1540688390'
@@ -553,8 +582,8 @@ public class Connector {
 
         01:02 UTC would be 02:02 CET ~ 02 CET
 
-    That means the first part of this string *is* the correct timestamp 
-    in unix epoch / UTC. 
+    That means the first part of this string *is* the correct timestamp
+    in unix epoch / UTC.
 
      */
 }
