@@ -395,9 +395,9 @@ public class Connector {
 
                     if (status == 401) {
                         // --- AUTHENTICATION ERROR ---
-                        System.err.println("WARN: Received 401 Unauthorized for coil ID " + coilid + ". Attempt " + attempt + "/" + MAX_RETRIES + ". Re-authenticating...");
+                        System.out.println("WARN: Received 401 Unauthorized for coil ID " + coilid + ". Attempt " + attempt + "/" + MAX_RETRIES + ". Re-authenticating...");
                         if (attempt == MAX_RETRIES) {
-                             System.err.println("ERROR: Authentication failed after " + MAX_RETRIES + " attempts. Skipping coil " + coilid + ".");
+                             System.out.println("ERROR: Authentication failed after " + MAX_RETRIES + " attempts. Skipping coil " + coilid + ".");
                              break; // Give up
                         }
                         this.authenticate(); // Get a new token
