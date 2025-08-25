@@ -180,7 +180,9 @@ public class Follower {
 
         Map<String, long[]> stationTimeBounds = new HashMap<>();
         Map<String, String> countries = conn.getCountries();
-        res = conn.getVehicles(0, 0, Instant.now().getEpochSecond(), sensors, coils_ts);
+        // retrieve data until now - 5 min
+        long ts_to = Instant.now().getEpochSecond() - 60 * 5;
+        res = conn.getVehicles(0, 0, ts_to, sensors, coils_ts);
 
         long t1 = System.currentTimeMillis();
 
