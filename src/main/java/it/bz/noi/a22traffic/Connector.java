@@ -27,7 +27,7 @@ public class Connector {
 
     private static final int WS_CONN_TIMEOUT_MSEC = 30000;
     private static final int WS_READ_TIMEOUT_MSEC = 1800000;
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private String token = null;
     private final String url;
@@ -411,7 +411,7 @@ public class Connector {
                         continue;
                     } else if (status != 200) {
                         // --- OTHER ERRORS ---
-                        if (DEBUG) {
+                        if (DEBUG || status == 500) {
                             System.out.println("    +- skipping (response status was " + status + ")");
                         }
                         // For other errors (e.g., 500), break the retry loop and skip this coil
