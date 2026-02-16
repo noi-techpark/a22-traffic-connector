@@ -368,99 +368,8 @@ public class Connector {
                 }
                 frTS = coils_fr.get(coilid) + "000+0000";
             }
-            
-            final int MAX_RETRIES = 10;
-            for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                if (DEBUG) {
-                    System.out.println("getVehicles is retrieving vehicle transit events for coil ID " + coilid + " interval " + frTS + " - " + toTS + ". Attempt " + attempt + "/" + MAX_RETRIES);
-                }
 
-                HttpURLConnection conn = null;
-                try {
-                    // make request
-                    conn = (HttpURLConnection) (new URL(url + "/traffico/transiti")).openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
-                    conn.setRequestProperty("Accept", "*/*");
-                    conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
-                    conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
-                    conn.setDoOutput(true);
-                    OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
-                    os.write("{\"request\":{\"sessionId\":\"" + token + "\",\"idspira\":" + coilid + ",\"fromData\":\"/Date(" + frTS + ")/\",\"toData\":\"/Date(" + toTS + ")/\"}}\n");
-                    os.flush();
-
-                    int status = conn.getResponseCode();
-                    http_codes.put(status, http_codes.getOrDefault(status, 0) + 1);
-
-                    if (status == 401) {
-                        // --- AUTHENTICATION ERROR ---
-                        System.out.println("WARN: Received 401 Unauthorized for coil ID " + coilid + ". Attempt " + attempt + "/" + MAX_RETRIES + ". Re-authenticating...");
-                        if (attempt == MAX_RETRIES) {
-                             System.out.println("ERROR: Authentication failed after " + MAX_RETRIES + " attempts. Skipping coil " + coilid + ".");
-                             break; // Give up
-                        }
-                        this.authenticate(); // Get a new token
-
-                        try {
-                            Thread.sleep(25L * attempt); // Sleep with increasing delay
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                        // Continue to next attempt
-                        continue;
-                    } else if (status != 200) {
-                        // --- OTHER ERRORS ---
-                        if (DEBUG || status == 500) {
-                            System.out.println("    +- skipping (response status was " + status + ")");
-                        }
-                        // For other errors (e.g., 500), break the retry loop and skip this coil
-                        break;
-                    }
-                
-                    // --- SUCCESS ---
-                    JSONObject response_json = (JSONObject) JSONValue.parse(new InputStreamReader(conn.getInputStream()));
-                    os.close();
-
-                    JSONArray event_list = (JSONArray) response_json.get("Traffico_GetTransitiResult");
-                    if (DEBUG) {
-                        System.out.println("    +- got " + event_list.size() + " events");
-                    }
-                    for (Object event_obj : event_list) {
-                        JSONObject event = (JSONObject) event_obj;
-                        HashMap<String, String> h = new HashMap<>();
-                        h.put("stationcode", "A22:" + event.get("idspira") + ":" + event.get("idsensore"));
-                        h.put("distance", "" + event.get("distanza"));
-                        h.put("headway", "" + event.get("avanzamento"));
-                        h.put("speed", "" + event.get("velocita"));
-                        h.put("length", "" + event.get("lunghezza"));
-                        h.put("axles", "" + event.get("assi"));
-                        h.put("class", "" + event.get("classe"));
-                        h.put("direction", "" + event.get("direzione"));
-                        h.put("country", "" + event.get("idNazionalita"));
-                        h.put("license_plate_initials", "" + event.get("targaIniziali"));
-                        h.put("timestamp", ("" + event.get("data")).substring(6, 16));
-                        h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
-                        output.add(h);
-                    }
-                    
-                } catch (Exception e) {
-                    // null pointer or cast exception in case the json hasn't the expected form
-                    e.printStackTrace();
-                    throw new RuntimeException("could not parse vehicle transit events");
-                } finally {
-                    if (conn != null) {
-                        conn.disconnect();
-                    }
-                }
-
-                try {
-                    Thread.sleep(25); // sleep a bit to avoid overloading the server
-                    break; // Success, exit retry loop
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            output.addAll(getVehiclesForCoil(coilid, frTS, toTS, http_codes));
         } // for coilid
 
         if (DEBUG) {
@@ -473,6 +382,120 @@ public class Connector {
 
         return output;
 
+    }
+
+    /**
+     * Retrieve vehicle transit events for a single coil ID within a time range.
+     * Can be called directly for per-coil processing (Follower) or via getVehicles() for batch processing (BulkLoader).
+     */
+    public ArrayList<HashMap<String, String>> getVehiclesForCoil(String coilid, long fr, long to) throws IOException {
+        if (url == null || token == null) {
+            throw new RuntimeException("there is no authenticated session");
+        }
+        String frTS = fr + "000+0000";
+        String toTS = to + "999+0000";
+        return getVehiclesForCoil(coilid, frTS, toTS, null);
+    }
+
+    private ArrayList<HashMap<String, String>> getVehiclesForCoil(String coilid, String frTS, String toTS, HashMap<Integer, Integer> http_codes) throws IOException {
+        ArrayList<HashMap<String, String>> output = new ArrayList<>();
+
+        final int MAX_RETRIES = 10;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            if (DEBUG) {
+                System.out.println("getVehiclesForCoil: coil ID " + coilid + " interval " + frTS + " - " + toTS + ". Attempt " + attempt + "/" + MAX_RETRIES);
+            }
+
+            HttpURLConnection conn = null;
+            try {
+                // make request
+                conn = (HttpURLConnection) (new URL(url + "/traffico/transiti")).openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("User-Agent", "IDM/traffic_a22");
+                conn.setRequestProperty("Accept", "*/*");
+                conn.setConnectTimeout(WS_CONN_TIMEOUT_MSEC);
+                conn.setReadTimeout(WS_READ_TIMEOUT_MSEC);
+                conn.setDoOutput(true);
+                OutputStreamWriter os = new OutputStreamWriter(conn.getOutputStream());
+                os.write("{\"request\":{\"sessionId\":\"" + token + "\",\"idspira\":" + coilid + ",\"fromData\":\"/Date(" + frTS + ")/\",\"toData\":\"/Date(" + toTS + ")/\"}}\n");
+                os.flush();
+
+                int status = conn.getResponseCode();
+                if (http_codes != null) {
+                    http_codes.put(status, http_codes.getOrDefault(status, 0) + 1);
+                }
+
+                if (status == 401) {
+                    // --- AUTHENTICATION ERROR ---
+                    System.out.println("WARN: Received 401 Unauthorized for coil ID " + coilid + ". Attempt " + attempt + "/" + MAX_RETRIES + ". Re-authenticating...");
+                    if (attempt == MAX_RETRIES) {
+                         System.out.println("ERROR: Authentication failed after " + MAX_RETRIES + " attempts. Skipping coil " + coilid + ".");
+                         break; // Give up
+                    }
+                    this.authenticate(); // Get a new token
+
+                    try {
+                        Thread.sleep(25L * attempt); // Sleep with increasing delay
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    // Continue to next attempt
+                    continue;
+                } else if (status != 200) {
+                    // --- OTHER ERRORS ---
+                    if (DEBUG || status == 500) {
+                        System.out.println("    +- skipping (response status was " + status + ")");
+                    }
+                    // For other errors (e.g., 500), break the retry loop and skip this coil
+                    break;
+                }
+
+                // --- SUCCESS ---
+                JSONObject response_json = (JSONObject) JSONValue.parse(new InputStreamReader(conn.getInputStream()));
+                os.close();
+
+                JSONArray event_list = (JSONArray) response_json.get("Traffico_GetTransitiResult");
+                if (DEBUG) {
+                    System.out.println("    +- got " + event_list.size() + " events");
+                }
+                for (Object event_obj : event_list) {
+                    JSONObject event = (JSONObject) event_obj;
+                    HashMap<String, String> h = new HashMap<>();
+                    h.put("stationcode", "A22:" + event.get("idspira") + ":" + event.get("idsensore"));
+                    h.put("distance", "" + event.get("distanza"));
+                    h.put("headway", "" + event.get("avanzamento"));
+                    h.put("speed", "" + event.get("velocita"));
+                    h.put("length", "" + event.get("lunghezza"));
+                    h.put("axles", "" + event.get("assi"));
+                    h.put("class", "" + event.get("classe"));
+                    h.put("direction", "" + event.get("direzione"));
+                    h.put("country", "" + event.get("idNazionalita"));
+                    h.put("license_plate_initials", "" + event.get("targaIniziali"));
+                    h.put("timestamp", ("" + event.get("data")).substring(6, 16));
+                    h.put("against_traffic", "" + (Boolean) event.get("controsenso"));
+                    output.add(h);
+                }
+
+            } catch (Exception e) {
+                // null pointer or cast exception in case the json hasn't the expected form
+                e.printStackTrace();
+                throw new RuntimeException("could not parse vehicle transit events");
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+
+            try {
+                Thread.sleep(25); // sleep a bit to avoid overloading the server
+                break; // Success, exit retry loop
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        return output;
     }
 
     private String getLaneText(String lane, String orientation) {
