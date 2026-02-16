@@ -22,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,6 +32,7 @@ import java.util.Map;
 public class Follower {
 
     private static final boolean DEBUG = true;
+    private static final long FOLLOW_CHUNK_SIZE = 3600; // 1 hour in seconds
 
     public static void fetchNew(Connector conn, String jdbc_url) throws IOException, ClassNotFoundException, SQLException {
 
@@ -171,59 +173,105 @@ public class Follower {
 
         // ---------------------------------------------------------------------
         // perform getVehicles() operation, insert new events, look for ghost sensors
-        long t0 = System.currentTimeMillis();
+        // if the gap is large (e.g. after source downtime), fetch in time chunks to avoid OOM
 
         ArrayList<HashMap<String, String>> res;
         HashMap<String, Integer> detected_ghosts = new HashMap<>();
-        
-        System.out.println("follow mode: getting events:");
-
         Map<String, long[]> stationTimeBounds = new HashMap<>();
         Map<String, String> countries = conn.getCountries();
+        long totalRecords = 0;
+        long totalRetrieveMs = 0;
+        long totalStoreMs = 0;
+
         // retrieve data until now - 5 min
         long ts_to = Instant.now().getEpochSecond() - 60 * 5;
-        res = conn.getVehicles(0, 0, ts_to, sensors, coils_ts);
+        int min_from = Collections.min(coils_ts.values());
+        boolean chunked = (ts_to - min_from) > FOLLOW_CHUNK_SIZE;
+        long chunk_to = chunked ? Math.min(ts_to, (long) min_from + FOLLOW_CHUNK_SIZE) : ts_to;
+        int chunkNum = 0;
 
-        long t1 = System.currentTimeMillis();
+        if (chunked) {
+            long totalChunks = ((ts_to - min_from) + FOLLOW_CHUNK_SIZE - 1) / FOLLOW_CHUNK_SIZE;
+            System.out.println("follow mode: large gap detected (" + (ts_to - min_from) + "s), will fetch in ~" + totalChunks + " chunks of " + FOLLOW_CHUNK_SIZE + "s");
+        }
 
-        pst = db.prepareStatement(
-                "insert into a22.a22_traffic "
-                + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction, country, license_plate_initials) "
-                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        for (i = 0; i < res.size(); i++) {
-            String s = res.get(i).get("stationcode");
-            if (!sensor_known.containsKey(s)) {
-                detected_ghosts.put(s, 1);
+        while (true) {
+            chunkNum++;
+            if (chunked) {
+                System.out.println("follow mode: chunk " + chunkNum + ", fetching up to " + chunk_to);
+            } else {
+                System.out.println("follow mode: getting events:");
             }
 
-            // min and max timestamp handling
-            String stationcode = res.get(i).get("stationcode");
-            long ts = Long.parseLong(res.get(i).get("timestamp"));
+            long t0 = System.currentTimeMillis();
+            res = conn.getVehicles(0, 0, chunk_to, sensors, coils_ts);
+            long t1 = System.currentTimeMillis();
 
-            long[] bounds = stationTimeBounds.getOrDefault(stationcode, new long[] { Long.MAX_VALUE, Long.MIN_VALUE });
-            bounds[0] = Math.min(bounds[0], ts);  // min timestamp
-            bounds[1] = Math.max(bounds[1], ts);  // max timestamp
-            stationTimeBounds.put(stationcode, bounds);
-            
-            pst.setString(1, stationcode);
-            pst.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
-            pst.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
-            pst.setDouble(4, Double.parseDouble(res.get(i).get("headway")));
-            pst.setDouble(5, Double.parseDouble(res.get(i).get("length")));
-            pst.setInt(6, Integer.parseInt(res.get(i).get("axles")));
-            pst.setBoolean(7, Boolean.parseBoolean(res.get(i).get("against_traffic")));
-            pst.setInt(8, Integer.parseInt(res.get(i).get("class")));
-            pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
-            pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
-            pst.setString(11, countries.get(res.get(i).get("country")));
-            pst.setString(12, "".equals(res.get(i).get("license_plate_initials")) ? null: res.get(i).get("license_plate_initials"));
-            pst.addBatch();
+            pst = db.prepareStatement(
+                    "insert into a22.a22_traffic "
+                    + "(stationcode, timestamp, distance, headway, length, axles, against_traffic, class, speed, direction, country, license_plate_initials) "
+                    + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            for (i = 0; i < res.size(); i++) {
+                String s = res.get(i).get("stationcode");
+                if (!sensor_known.containsKey(s)) {
+                    detected_ghosts.put(s, 1);
+                }
+
+                // min and max timestamp handling
+                String stationcode = res.get(i).get("stationcode");
+                long ts = Long.parseLong(res.get(i).get("timestamp"));
+
+                long[] bounds = stationTimeBounds.getOrDefault(stationcode, new long[] { Long.MAX_VALUE, Long.MIN_VALUE });
+                bounds[0] = Math.min(bounds[0], ts);  // min timestamp
+                bounds[1] = Math.max(bounds[1], ts);  // max timestamp
+                stationTimeBounds.put(stationcode, bounds);
+
+                pst.setString(1, stationcode);
+                pst.setInt(2, Integer.parseInt(res.get(i).get("timestamp")));
+                pst.setDouble(3, Double.parseDouble(res.get(i).get("distance")));
+                pst.setDouble(4, Double.parseDouble(res.get(i).get("headway")));
+                pst.setDouble(5, Double.parseDouble(res.get(i).get("length")));
+                pst.setInt(6, Integer.parseInt(res.get(i).get("axles")));
+                pst.setBoolean(7, Boolean.parseBoolean(res.get(i).get("against_traffic")));
+                pst.setInt(8, Integer.parseInt(res.get(i).get("class")));
+                pst.setDouble(9, Double.parseDouble(res.get(i).get("speed")));
+                pst.setInt(10, Integer.parseInt(res.get(i).get("direction")));
+                pst.setString(11, countries.get(res.get(i).get("country")));
+                pst.setString(12, "".equals(res.get(i).get("license_plate_initials")) ? null: res.get(i).get("license_plate_initials"));
+                pst.addBatch();
+            }
+            pst.executeBatch();
+            pst.close();
+            db.commit();
+            long t2 = System.currentTimeMillis();
+
+            totalRecords += res.size();
+            totalRetrieveMs += (t1 - t0);
+            totalStoreMs += (t2 - t1);
+
+            if (chunked) {
+                System.out.println("follow mode: chunk " + chunkNum + ": " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms)");
+
+                // update coils_ts from results so next chunk starts where this one left off
+                for (i = 0; i < res.size(); i++) {
+                    String stationcode = res.get(i).get("stationcode");
+                    int ts = Integer.parseInt(res.get(i).get("timestamp"));
+                    String[] split = stationcode.split(":");
+                    if (split.length == 3) {
+                        String coilid = split[1];
+                        Integer current = coils_ts.get(coilid);
+                        if (current == null || ts + 1 > current) {
+                            coils_ts.put(coilid, ts + 1);
+                        }
+                    }
+                }
+            }
+
+            if (chunk_to >= ts_to) {
+                break;
+            }
+            chunk_to = Math.min(ts_to, chunk_to + FOLLOW_CHUNK_SIZE);
         }
-        pst.executeBatch();
-        pst.close();
-        db.commit();
-
-        long t2 = System.currentTimeMillis();
 
         pst = db.prepareStatement("insert into a22.a22_ghost_station (code) values (?)");
         for (String s : detected_ghosts.keySet()) {
@@ -235,8 +283,8 @@ public class Follower {
 
         // flush min and max timestamps
         Stations.updateStationTimestamps(jdbc_url, stationTimeBounds);
-        
-        System.out.println("follow mode: " + res.size() + " records (retrieve " + (t1 - t0) + " ms, store " + (t2 - t1) + " ms), new ghost sensors detected: " + detected_ghosts.size());
+
+        System.out.println("follow mode: " + totalRecords + " records total (retrieve " + totalRetrieveMs + " ms, store " + totalStoreMs + " ms), new ghost sensors detected: " + detected_ghosts.size());
 
         // ---------------------------------------------------------------------
         // disconnect from Postgres
