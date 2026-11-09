@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+apiVersion: v2
+name: a22-traffic-connector
+description: A22 traffic connector, follows the A22 web service and stores traffic data in the a22db database
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+image:
+  repository: "" # injected by CI
+  tag: ""        # injected by CI
+  pullPolicy: IfNotPresent
+
+# follow | month <year> <month> | interval <start_ts> <end_ts>
+operationMode: follow
+
+env:
+  _JAVA_OPTIONS: -Xms128m -Xmx512m
+
+envSecret:
+  JDBC_URL: "" # injected by CI
+
+# measured on docker over 55 days in follow mode: peak memory 327 MiB, average cpu 0.007 cores
+resources:
+  requests:
+    cpu: 25m
+    memory: 384Mi
+  limits:
+    memory: 768Mi

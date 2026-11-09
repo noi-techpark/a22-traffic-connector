@@ -7,97 +7,104 @@ env:
   DOCKER_IMAGE: ghcr.io/${{ github.repository }}/a22-traffic-connector
   DOCKER_TAG: ${{ github.sha }}
   JAVA_VERSION: 8
+  KUBERNETES_NAMESPACE: collector
+  K8S_NAME: a22-traffic-connector
+  CHART_PATH: infrastructure/helm
 
 jobs:
+  build:
+    runs-on: ubuntu-24.04
+    concurrency: build
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@v5
+
+      - name: Validate Helm templates
+        run: |
+          helm lint ${{ env.CHART_PATH }}
+          helm template ${{ env.K8S_NAME }} ${{ env.CHART_PATH }} -f ${{ env.CHART_PATH }}/values.yaml -f ${{ env.CHART_PATH }}/test.yaml
+          helm template ${{ env.K8S_NAME }} ${{ env.CHART_PATH }} -f ${{ env.CHART_PATH }}/values.yaml -f ${{ env.CHART_PATH }}/prod.yaml
+
+      - name: Build project
+        uses: noi-techpark/github-actions/maven-build@v2
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          build-command: 'mvn -B clean package'
+
+      - name: Build and push images
+        uses: noi-techpark/github-actions/docker-build-and-push@v2
+        with:
+          working-directory: infrastructure
+          docker-username: ${{ github.actor }}
+          docker-password: ${{ secrets.GITHUB_TOKEN }}
 
   # TODO: disable again
-  # Disable test deployment, because heavy on database and docker resources
+  # Disable test deployment, because heavy on database and cluster resources
   # Enable again if test environment is needed
 
   # Deploy Test
   deploy-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs: build
     if: github.ref == 'refs/heads/main'
     concurrency: deploy-test
+    environment: test
+    env:
+      VALUES_YAML: infrastructure/helm/test.yaml
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v2
-      - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@v1
-      - name: Create .env file
-        uses: noi-techpark/github-actions/env-file@v2
-        env:
-          # General deployment options
-          X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-          X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_JAVA_OPTIONS: -Xms128m -Xmx2048m
-          X_JDBC_URL: ${{ secrets.TEST_JDBC_URL }}
-          X_OPERATION_MODE: "follow"
-          # X_OPERATION_MODE: "month 2024 11"
+        uses: actions/checkout@v4
 
-      - name: Build project
-        uses: noi-techpark/github-actions/maven-build@v2
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          build-command: 'mvn -B clean package'
+      - name: Customize values.yaml
+        run: |
+          yq -i '.image.repository = "${{ env.DOCKER_IMAGE }}"' ${{ env.VALUES_YAML }}
+          yq -i '.image.tag = "${{ env.DOCKER_TAG }}"' ${{ env.VALUES_YAML }}
+          yq -i '.envSecret.JDBC_URL = "${{ secrets.TEST_JDBC_URL }}"' ${{ env.VALUES_YAML }}
+          yq -i '.operationMode = "follow"' ${{ env.VALUES_YAML }}
 
-      - name: Build and push images
-        uses: noi-techpark/github-actions/docker-build-and-push@v2
+      - name: Deploy on cluster
+        uses: noi-techpark/github-actions/helm-deploy@v2
         with:
-          working-directory: infrastructure
-          docker-username: ${{ github.actor }}
-          docker-password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Deploy application
-        uses: noi-techpark/github-actions/docker-deploy@v2
-        with:
-          working-directory: infrastructure/ansible
-          hosts: 'test'
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          docker-username: 'noi-techpark-bot'
-          docker-password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          project-name: ${{ env.PROJECT_NAME }}
+          k8s-name: ${{ env.K8S_NAME }}
+          k8s-namespace: ${{ env.KUBERNETES_NAMESPACE }}
+          chart-path: ${{ env.CHART_PATH }}
+          values-file: ${{ env.VALUES_YAML }}
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-eks-cluster-name: aws-main-eu-01
+          aws-region: eu-west-1
 
   # Deploy Prod
   deploy-prod:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs: build
     if: github.ref == 'refs/heads/prod'
     concurrency: deploy-prod
+    environment: prod
+    env:
+      VALUES_YAML: infrastructure/helm/prod.yaml
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v2
-      - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@v1
-      - name: Create .env file
-        uses: noi-techpark/github-actions/env-file@v2
-        env:
-          # General deployment options
-          X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-          X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_JAVA_OPTIONS: -Xms128m -Xmx2048m
-          X_JDBC_URL: ${{ secrets.PROD_JDBC_URL }}
-          X_OPERATION_MODE: "follow"
-      - name: Build project
-        uses: noi-techpark/github-actions/maven-build@v2
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          build-command: 'mvn -B clean package'
+        uses: actions/checkout@v4
 
-      - name: Build and push images
-        uses: noi-techpark/github-actions/docker-build-and-push@v2
-        with:
-          working-directory: infrastructure
-          docker-username: ${{ github.actor }}
-          docker-password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Customize values.yaml
+        run: |
+          yq -i '.image.repository = "${{ env.DOCKER_IMAGE }}"' ${{ env.VALUES_YAML }}
+          yq -i '.image.tag = "${{ env.DOCKER_TAG }}"' ${{ env.VALUES_YAML }}
+          yq -i '.envSecret.JDBC_URL = "${{ secrets.PROD_JDBC_URL }}"' ${{ env.VALUES_YAML }}
+          yq -i '.operationMode = "follow"' ${{ env.VALUES_YAML }}
 
-      - name: Deploy application
-        uses: noi-techpark/github-actions/docker-deploy@v2
+      - name: Deploy on cluster
+        uses: noi-techpark/github-actions/helm-deploy@v2
         with:
-          working-directory: infrastructure/ansible
-          hosts: 'prod'
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          docker-username: 'noi-techpark-bot'
-          docker-password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          project-name: ${{ env.PROJECT_NAME }}
+          k8s-name: ${{ env.K8S_NAME }}
+          k8s-namespace: ${{ env.KUBERNETES_NAMESPACE }}
+          chart-path: ${{ env.CHART_PATH }}
+          values-file: ${{ env.VALUES_YAML }}
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-eks-cluster-name: aws-main-eu-01
+          aws-region: eu-west-1
